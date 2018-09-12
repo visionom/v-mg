@@ -1,12 +1,5 @@
 package blas
 
-func Daxpy(a float64, x []float64, y []float64) []float64 {
-	for i, xi := range x {
-		y[i] = a*xi + y[i]
-	}
-	return y
-}
-
 func Dgemm(transA, transB rune, m, n, k int, alpha float64, a []float64, lda int, b []float64, ldb int, beta float64, c []float64, ldc int) (rc []float64) {
 	rc = make([]float64, m*n)
 	noTA := false
