@@ -5,37 +5,11 @@ import (
 	"encoding/binary"
 	"log"
 	"os"
+
+	"github.com/visionom/vision-mg/gems/mtx"
 )
 
-type MGMatrix struct {
-	M    int
-	N    int
-	Data []float32
-}
-
-type MGSession struct {
-	Ws []MGMatrix
-	Bs []float32
-}
-
-type MG interface {
-	ReadData()
-	InitSession()
-	Model()
-	Loss()
-	Test()
-	Run()
-}
-
-type MnistMG struct {
-	MGSession
-	TrainData  []MGMatrix
-	TrainLabel []int
-	TestData   []MGMatrix
-	Testlabel  []int
-}
-
-func readImage(path string) []MGMatrix {
+func readImage(path string) mtx.Mtx {
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
@@ -66,13 +40,14 @@ func readImage(path string) []MGMatrix {
 		" >>> cols number: %d",
 		path, magic, imgNum, rows, cols)
 
-	images := make([]MGMatrix, imgNum)
-	for i := 0; i < int(imgNum); i++ {
-		bs = make([]byte, rows*cols)
+	images := mtx.NewMtx(mtx.Shape{int(imgNum), int(cols * rows)})
+	k := 0
+	for j := 0; j < int(imgNum); j++ {
+		bs = make([]byte, int(cols*rows))
 		n, err = gr.Read(bs)
-		images[i] = MGMatrix{M: int(rows), N: int(cols), Data: make([]float32, 28*28)}
-		for j, b := range bs {
-			images[i].Data[j] = float32(b)
+		for _, b := range bs {
+			images.Data[k] = float64(b) / 255.0
+			k++
 		}
 	}
 	return images
@@ -106,23 +81,10 @@ func readLabel(path string) []int {
 		path, magic, nums)
 
 	labels := make([]int, nums)
-	bs = make([]byte, nums)
-	n, err = gr.Read(bs)
-	for i, b := range bs {
-		labels[i] = int(b)
+	for i := 0; i < int(nums); i++ {
+		bs = make([]byte, 1)
+		n, err = gr.Read(bs)
+		labels[i] = int(bs[0])
 	}
 	return labels
-}
-
-func (m *MnistMG) ReadData() {
-	m.TrainData = readImage("./MNIST_data/train-images-idx3-ubyte.gz")
-	m.TrainLabel = readLabel("./MNIST_data/train-labels-idx1-ubyte.gz")
-
-	m.TestData = readImage("./MNIST_data/t10k-images-idx3-ubyte.gz")
-	m.Testlabel = readLabel("./MNIST_data/t10k-labels-idx1-ubyte.gz")
-}
-
-func main() {
-	m := MnistMG{}
-	m.ReadData()
 }
