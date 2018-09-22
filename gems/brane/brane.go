@@ -1,5 +1,10 @@
 package brane
 
+type Brane interface {
+	Forward()
+	Backward()
+}
+
 var ReduceMean = reduceMean
 
 var Normpdf = normpdf
