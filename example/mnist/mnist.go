@@ -71,13 +71,13 @@ func get(m mtx.Mtx, l []int, nums int) (mtx.Mtx, []int) {
 	for j, k := range p {
 		label[j] = l[k]
 	}
-	input := mtx.GetMtxRows(m, p)
+	input := m.GetRows(p)
 	return input, label
 }
 
 func initT(t mtx.Mtx, label []int) mtx.Mtx {
 	for i, v := range label {
-		t.Data[v*t.Shape[1]+i] = 1.0
+		t.Set(v, i, 1.0)
 	}
 	return t
 }

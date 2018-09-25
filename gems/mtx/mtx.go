@@ -1,16 +1,10 @@
 package mtx
 
-import (
-	"fmt"
-
-	"github.com/visionom/vision-mg/gems/blas"
-)
-
-type Shape = []int
+type Shape = [2]int
 
 type Mtx struct {
 	Shape Shape
-	Data  []float64
+	data  []float64
 }
 
 func NewMtx(s Shape) Mtx {
@@ -24,56 +18,76 @@ func NewMtx(s Shape) Mtx {
 	}
 }
 
-func Mul(a, b Mtx) Mtx {
-	ra := Mtx{}
-	if len(a.Shape) == 2 && len(b.Shape) == 2 && a.Shape[1] == b.Shape[0] {
-		ra.Data = blas.Dgemm('N', 'N', a.Shape[0], b.Shape[1], a.Shape[1], 1, a.Data, 1, b.Data, 1, 0, nil, 1)
-		ra.Shape = Shape{a.Shape[0], b.Shape[1]}
-	} else {
-		fmt.Println("error", a.Shape, b.Shape)
-	}
-	return ra
+func (m *Mtx) VGet(x int) float64 {
+	return m.data[x]
 }
 
-func MulAT(a, b Mtx) Mtx {
-	if len(a.Shape) == 2 && len(b.Shape) == 2 {
-		a.Data = blas.Dgemm('T', 'N', a.Shape[1], b.Shape[1], a.Shape[0], 1, a.Data, 1, b.Data, 1, 0, nil, 1)
-		a.Shape[0] = a.Shape[1]
-		a.Shape[1] = b.Shape[1]
-	}
-	return a
+func (m *Mtx) VSet(x int, d float64) {
+	m.data[x] = d
 }
 
-func Plus(a, b Mtx) Mtx {
-	a.Data = blas.Daxpy(1.0, a.Data, b.Data)
-	return a
+func (m *Mtx) Get(x, y int) float64 {
+	return m.data[x*m.Shape[1]+y]
 }
 
-func Axpy(a float64, x Mtx, y Mtx) Mtx {
-	x.Data = blas.Daxpy(a, x.Data, y.Data)
-	return x
+func (m *Mtx) Set(x, y int, d float64) {
+	m.data[x*m.Shape[1]+y] = d
 }
 
-func GetMtxCols(a Mtx, cols []int) Mtx {
-	lcols := len(cols)
-	s := Shape{a.Shape[0], lcols}
+func (m *Mtx) GetCol(n int) Mtx {
+	s := Shape{m.Shape[0], 1}
 	ra := NewMtx(s)
-	for j, col := range cols {
-		for i := 0; i < a.Shape[0]; i++ {
-			ra.Data[i*s[1]+j] = a.Data[i*a.Shape[1]+col]
-		}
+	for i := 0; i < s[0]; i++ {
+		ra.Set(i, 0, m.Get(i, n))
 	}
 	return ra
 }
 
-func GetMtxRows(a Mtx, rows []int) Mtx {
+func (m *Mtx) GetRow(n int) Mtx {
+	s := Shape{1, m.Shape[1]}
+	ra := NewMtx(s)
+	for i := 0; i < s[1]; i++ {
+		ra.Set(0, i, m.Get(n, i))
+	}
+	return ra
+}
+
+func (m *Mtx) SetCol(a Mtx, n int) {
+	for i := 0; i < m.Shape[0]; i++ {
+		m.Set(i, n, a.VGet(i))
+	}
+}
+
+func (m *Mtx) SetRow(a Mtx, n int) {
+	for i := 0; i < m.Shape[1]; i++ {
+		m.Set(n, i, a.VGet(i))
+	}
+}
+
+func (m *Mtx) GetData() []float64 {
+	return m.data
+}
+
+func (m *Mtx) SetData(data []float64) {
+	m.data = data
+}
+
+func (m *Mtx) GetCols(cols []int) Mtx {
+	lcols := len(cols)
+	s := Shape{m.Shape[0], lcols}
+	ra := NewMtx(s)
+	for j, k := range cols {
+		ra.SetCol(m.GetCol(k), j)
+	}
+	return ra
+}
+
+func (m *Mtx) GetRows(rows []int) Mtx {
 	lrows := len(rows)
-	s := Shape{lrows, a.Shape[1]}
+	s := Shape{lrows, m.Shape[1]}
 	ra := NewMtx(s)
 	for j, k := range rows {
-		for i := 0; i < s[1]; i++ {
-			ra.Data[j*s[1]+i] = a.Data[k*s[0]+i]
-		}
+		ra.SetRow(m.GetRow(k), j)
 	}
 	return ra
 }

@@ -46,7 +46,7 @@ func readImage(path string) mtx.Mtx {
 		bs = make([]byte, int(cols*rows))
 		n, err = gr.Read(bs)
 		for _, b := range bs {
-			images.Data[k] = float64(b) / 255.0
+			images.VSet(k, float64(b)/255.0)
 			k++
 		}
 	}
