@@ -1,5 +1,9 @@
 package mtx
 
+import (
+	"fmt"
+)
+
 type Shape = [2]int
 
 type Mtx struct {
@@ -16,6 +20,47 @@ func NewMtx(s Shape) Mtx {
 		s,
 		make([]float64, sum),
 	}
+}
+
+func (m Mtx) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			fmt.Fprintf(s, "Shape:\t%v\nData: ", m.Shape)
+			for i := 0; i < m.Shape[0]; i++ {
+				fmt.Fprint(s, "\t[")
+				for j := 0; j < m.Shape[0]; j++ {
+					fmt.Fprintf(s, " %.4e", m.Get(i, j))
+				}
+				fmt.Fprint(s, "]\n")
+			}
+			return
+		} else {
+			v1 := m.Get(0, 0)
+			v2 := m.Get(0, m.Shape[1]-1)
+			v3 := m.Get(m.Shape[0]-1, 0)
+			v4 := m.Get(m.Shape[0]-1, m.Shape[1]-1)
+			fmt.Fprintf(s, "Shape:\t%v\nData: ", m.Shape)
+			fmt.Fprintf(s, "\t%.4e . . . %.4e\n", v1, v2)
+			fmt.Fprintf(s, "\t    .      .         .       \n")
+			fmt.Fprintf(s, "\t    .        .       .       \n")
+			fmt.Fprintf(s, "\t    .          .     .       \n")
+			fmt.Fprintf(s, "\t%.4e . . . %.4e\n", v3, v4)
+		}
+	case 's':
+		fallthrough
+	case 'q':
+		fallthrough
+	default:
+	}
+}
+
+func (m *Mtx) Clone() Mtx {
+	rm := NewMtx(m.Shape)
+	data := make([]float64, len(m.data))
+	copy(data, m.data)
+	rm.SetData(data)
+	return rm
 }
 
 func (m *Mtx) VGet(x int) float64 {
@@ -52,13 +97,13 @@ func (m *Mtx) GetRow(n int) Mtx {
 	return ra
 }
 
-func (m *Mtx) SetCol(a Mtx, n int) {
+func (m *Mtx) SetCol(n int, a Mtx) {
 	for i := 0; i < m.Shape[0]; i++ {
 		m.Set(i, n, a.VGet(i))
 	}
 }
 
-func (m *Mtx) SetRow(a Mtx, n int) {
+func (m *Mtx) SetRow(n int, a Mtx) {
 	for i := 0; i < m.Shape[1]; i++ {
 		m.Set(n, i, a.VGet(i))
 	}
@@ -77,7 +122,7 @@ func (m *Mtx) GetCols(cols []int) Mtx {
 	s := Shape{m.Shape[0], lcols}
 	ra := NewMtx(s)
 	for j, k := range cols {
-		ra.SetCol(m.GetCol(k), j)
+		ra.SetCol(j, m.GetCol(k))
 	}
 	return ra
 }
@@ -87,7 +132,7 @@ func (m *Mtx) GetRows(rows []int) Mtx {
 	s := Shape{lrows, m.Shape[1]}
 	ra := NewMtx(s)
 	for j, k := range rows {
-		ra.SetRow(m.GetRow(k), j)
+		ra.SetRow(j, m.GetRow(k))
 	}
 	return ra
 }

@@ -8,10 +8,10 @@ type ReluBrane struct {
 	mask mtx.Mtx
 }
 
-func (brn *ReluBrane) Forward(a mtx.Mtx) mtx.Mtx {
-	brn.mask = mtx.NewMtx(a.Shape)
-	out := mtx.NewMtx(a.Shape)
-	for i, v := range a.GetData() {
+func (brn *ReluBrane) Forward(x mtx.Mtx) mtx.Mtx {
+	brn.mask = mtx.NewMtx(x.Shape)
+	out := mtx.NewMtx(x.Shape)
+	for i, v := range x.GetData() {
 		if v < 0 {
 			brn.mask.VSet(i, 0)
 		} else {
