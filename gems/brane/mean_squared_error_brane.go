@@ -15,5 +15,7 @@ func meanSquaredErr(a mtx.Mtx, b mtx.Mtx) mtx.Mtx {
 		}
 	}
 
+	//	log.Printf("%+v", mtx.Ax(0.5, m))
+
 	return mtx.Ax(0.5, m)
 }

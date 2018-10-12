@@ -12,16 +12,16 @@ type SoftmaxBrane struct {
 
 func (brn *SoftmaxBrane) Forward(x mtx.Mtx) mtx.Mtx {
 	s := make([]float64, x.Shape[0])
+	e := mtx.NewMtx(x.Shape)
 	var c float64
 	rx := mtx.NewMtx(x.Shape)
 	for j := 0; j < x.Shape[0]; j++ {
 		for i := 0; i < x.Shape[1]; i++ {
-			v := x.Get(i, j)
-			s[j] += math.Exp(v - c)
+			e.Set(j, i, math.Exp(x.Get(j, i)-c))
+			s[j] += e.Get(j, i)
 		}
 		for i := 0; i < rx.Shape[1]; i++ {
-			v := rx.Get(i, j)
-			rx.Set(i, j, math.Exp(v-c)/s[j])
+			rx.Set(j, i, e.Get(j, i)/s[j])
 		}
 	}
 	return rx
@@ -41,13 +41,13 @@ func softmax(a mtx.Mtx, c float64) mtx.Mtx {
 	for j := 0; j < a.Shape[0]; j++ {
 		sum = 0
 		for i := 0; i < a.Shape[1]; i++ {
-			v := a.Get(i, j)
+			v := a.Get(j, i)
 			sum += math.Exp(v - c)
 		}
 		for i := 0; i < a.Shape[1]; i++ {
-			v := a.Get(i, j)
-			ra.Set(i, j, math.Exp(v-c)/sum)
+			v := a.Get(j, i)
+			ra.Set(j, i, math.Exp(v-c)/sum)
 		}
 	}
-	return a
+	return ra
 }

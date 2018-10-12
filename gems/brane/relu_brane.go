@@ -31,10 +31,11 @@ func (brn *ReluBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 }
 
 func relu(a mtx.Mtx) mtx.Mtx {
+	ra := mtx.NewMtx(a.Shape)
 	for i, v := range a.GetData() {
 		if v < 0 {
-			a.VSet(i, 0)
+			ra.VSet(i, 0)
 		}
 	}
-	return a
+	return ra
 }

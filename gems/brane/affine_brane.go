@@ -1,13 +1,15 @@
 package brane
 
-import "github.com/visionom/vision-mg/gems/mtx"
+import (
+	"github.com/visionom/vision-mg/gems/mtx"
+)
 
 type AffineBrane struct {
 	x  mtx.Mtx
 	w  mtx.Mtx
-	dw mtx.Mtx
+	Dw mtx.Mtx
 	b  float64
-	db float64
+	Db float64
 }
 
 func NewAffineBrane(w mtx.Mtx, b float64) AffineBrane {
@@ -24,7 +26,7 @@ func (brn *AffineBrane) Forward(x mtx.Mtx) mtx.Mtx {
 
 func (brn *AffineBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 	dx := mtx.MulBT(dout, brn.w)
-	brn.dw = mtx.MulAT(brn.x, dout)
-	brn.db = mtx.Sum(dout)
+	brn.Dw = mtx.MulAT(brn.x, dout)
+	brn.Db = mtx.Sum(dout)
 	return dx
 }
