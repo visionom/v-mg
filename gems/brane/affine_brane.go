@@ -21,7 +21,7 @@ func NewAffineBrane(w mtx.Mtx, b float64) AffineBrane {
 
 func (brn *AffineBrane) Forward(x mtx.Mtx) mtx.Mtx {
 	brn.x = x
-	return mtx.Mul(x, brn.w)
+	return mtx.MulBeta(x, brn.w, brn.b)
 }
 
 func (brn *AffineBrane) Backward(dout mtx.Mtx) mtx.Mtx {

@@ -23,30 +23,22 @@ type session struct {
 }
 
 func main() {
-	//TrainData := readImage("./MNIST_data/train-images-idx3-ubyte")
-	//TrainLabel := readLabel("./MNIST_data/train-labels-idx1-ubyte")
-	TrainData := mtx.NewMtx(mtx.Shape{10000, 3})
-	TrainLabel := make([]int, 10000)
-	for i := 0; i < 10000; i++ {
-		TrainData.Set(i, 0, 1.0*float64(i))
-		TrainData.Set(i, 1, 2.0*float64(i%3))
-		TrainData.Set(i, 2, 3.0*float64(i%3))
-		TrainLabel[i] = i % 2
-	}
+	TrainData := readImage("./MNIST_data/train-images-idx3-ubyte")
+	TrainLabel := readLabel("./MNIST_data/train-labels-idx1-ubyte")
 
 	//TrainData := readImage("./MNIST_data/t10k-images-idx3-ubyte")
 	//TrainLabel := readLabel("./MNIST_data/t10k-labels-idx1-ubyte")
 
 	input := TrainData
 	label := TrainLabel
-	ms := readM()
+	//ms := readM()
 
-	dataSize := 3
-	n1Size := 3
-	oSize := 2
+	dataSize := 784
+	n1Size := 16
+	oSize := 10
 	bSize := 2
 
-	ms = make([]mtx.Mtx, 3)
+	ms := make([]mtx.Mtx, 3)
 	ms[0] = mtx.NewMtx(mtx.Shape{dataSize, n1Size})
 	ms[1] = mtx.NewMtx(mtx.Shape{n1Size, oSize})
 	//ms[0] = brane.Normpdf(mtx.NewMtx(mtx.Shape{dataSize, n1Size}), 1, 1)
@@ -73,14 +65,15 @@ func getRandIntList(size, n int) []int {
 	return l
 }
 
-func get(m mtx.Mtx, l []int, nums int) (mtx.Mtx, []int) {
+func get(m mtx.Mtx, l []int, nums int) (mtx.Mtx, mtx.Mtx) {
 	p := getRandIntList(m.Shape[0], nums)
 	label := make([]int, nums)
 	for j, k := range p {
 		label[j] = l[k]
 	}
 	input := m.GetRows(p)
-	return input, label
+	ml := initT(mtx.Shape{nums, 10}, label)
+	return input, ml
 }
 
 func initT(s mtx.Shape, label []int) mtx.Mtx {
@@ -92,7 +85,8 @@ func initT(s mtx.Shape, label []int) mtx.Mtx {
 }
 
 func model(input, w1, wo, bs mtx.Mtx) mtx.Mtx {
-	h1 := brane.Sigmoid(mtx.Aopy(bs.VGet(0), mtx.Mul(input, w1)))
+	b1 := brane.NewSigmoidBrane()
+	h1 := b1.Backward(mtx.Aopy(bs.VGet(0), mtx.Mul(input, w1)))
 
 	o := mtx.Aopy(bs.VGet(1), mtx.Mul(h1, wo))
 	return o
@@ -105,9 +99,9 @@ func predict(input, w1, wo, bs mtx.Mtx) []int {
 
 func accuracy(input, w1, wo, bs, t mtx.Mtx) float64 {
 	o := model(input, w1, wo, bs)
-	so := brane.Softmax(o, 0)
-	errs := brane.MeanSquaredErr(so, t)
-	return brane.ReduceMean(errs)
+	b := brane.NewSoftmaxCrossEntropyLossBrane()
+	errs := b.Forward(o, t)
+	return errs
 }
 
 func lossf(input, t mtx.Mtx, p []mtx.Mtx, n int) func(mtx.Mtx) float64 {
@@ -138,11 +132,10 @@ func NumericalGradient(loss func(mtx.Mtx) float64, a mtx.Mtx, h float64) mtx.Mtx
 
 func BGradientDescent(input mtx.Mtx, t []int, ms []mtx.Mtx, stepNum int, rate float64) []mtx.Mtx {
 	linput, lt := get(input, t, 10)
-	mt := initT(mtx.Shape{2, 10}, lt)
-	for i := 0; i < stepNum; i++ {
+	for j := 0; j < stepNum; j++ {
 		var r float64
-		for i = 0; i < len(ms); i++ {
-			f := lossf(linput, mt, ms, i)
+		for i := 0; i < len(ms); i++ {
+			f := lossf(linput, lt, ms, i)
 			x := ms[i].Clone()
 			r = f(x)
 			grad := NumericalGradient(f, x, rate)
@@ -157,7 +150,7 @@ func BGradientDescent(input mtx.Mtx, t []int, ms []mtx.Mtx, stepNum int, rate fl
 		log.Println(r)
 		o := predict(linput, ms[0], ms[1], ms[2])
 		log.Println(o)
-		log.Println(lt)
+		log.Println(brane.MaxIndex(lt))
 	}
 	return ms
 }

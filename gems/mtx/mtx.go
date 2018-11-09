@@ -22,6 +22,10 @@ func NewMtx(s Shape) Mtx {
 	}
 }
 
+func NewMtxNE(s Shape, data []float64) Mtx {
+	return Mtx{s, data}
+}
+
 func NewOnes(s Shape) Mtx {
 	sum := 1
 	for _, v := range s {
@@ -45,7 +49,7 @@ func (m Mtx) Format(s fmt.State, verb rune) {
 					if i%n == 0 {
 						fmt.Fprint(s, "\t[")
 					}
-					fmt.Fprintf(s, " %.1f", v)
+					fmt.Fprintf(s, " %.4f", v)
 					if i%n == n-1 {
 						fmt.Fprint(s, "]\n")
 					}

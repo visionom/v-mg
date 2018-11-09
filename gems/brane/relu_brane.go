@@ -8,6 +8,10 @@ type ReluBrane struct {
 	mask mtx.Mtx
 }
 
+func NewReluBrane() ReluBrane {
+	return ReluBrane{}
+}
+
 func (brn *ReluBrane) Forward(x mtx.Mtx) mtx.Mtx {
 	brn.mask = mtx.NewMtx(x.Shape)
 	out := mtx.NewMtx(x.Shape)
@@ -28,14 +32,4 @@ func (brn *ReluBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 		dx.VSet(i, v*dout.VGet(i))
 	}
 	return dx
-}
-
-func relu(a mtx.Mtx) mtx.Mtx {
-	ra := mtx.NewMtx(a.Shape)
-	for i, v := range a.GetData() {
-		if v < 0 {
-			ra.VSet(i, 0)
-		}
-	}
-	return ra
 }

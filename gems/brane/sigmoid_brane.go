@@ -8,7 +8,7 @@ import (
 
 type SigmoidBrane struct{}
 
-func NewSigmoid() SigmoidBrane {
+func NewSigmoidBrane() SigmoidBrane {
 	return SigmoidBrane{}
 }
 
@@ -26,12 +26,4 @@ func (brn *SigmoidBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 		dx.VSet(i, v*(1-v))
 	}
 	return dx
-}
-
-func sigmoid(a mtx.Mtx) mtx.Mtx {
-	ra := mtx.NewMtx(a.Shape)
-	for i, v := range a.GetData() {
-		ra.VSet(i, 1.0/float64(1.0+math.Exp(-1.0*v)))
-	}
-	return ra
 }

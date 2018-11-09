@@ -14,8 +14,8 @@ type CrossEntropyErrorBrane struct {
 func (brn *CrossEntropyErrorBrane) Forward(t, x mtx.Mtx) float64 {
 	var e float64
 	n := len(t.GetData())
-	for k, tk := range t.GetData() {
-		e -= tk * math.Log(x.VGet(k)) / float64(n)
+	for i, ti := range t.GetData() {
+		e -= ti * math.Log(x.VGet(i)) / float64(n)
 	}
 	return e
 }
