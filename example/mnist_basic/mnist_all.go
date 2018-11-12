@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/visionom/vision-mg/gems/brane"
 	"github.com/visionom/vision-mg/gems/mtx"
@@ -11,7 +12,7 @@ import (
 func main() {
 	TrainData := readImage("./MNIST_data/train-images-idx3-ubyte")
 	TrainLabel := readLabel("./MNIST_data/train-labels-idx1-ubyte")
-	lens := 1
+	lens := 100
 	list := make([]int, lens)
 	for i := range list {
 		list[i] = i
@@ -26,6 +27,12 @@ func main() {
 	b := mtx.NewMtx(mtx.Shape{1, 2})
 	b.VSet(0, -4.0)
 	b.VSet(1, -1.0)
+	if true {
+		ms := readM()
+		w1 = ms[0]
+		wo = ms[1]
+		b = ms[2]
+	}
 	l := loss(input, initT(label), w1, wo, b)
 	fmt.Printf("%v\n", l)
 	gradientDescent(input, initT(label), w1, wo, b)
@@ -53,6 +60,7 @@ func loss(input, label, w1, wo, b mtx.Mtx) float64 {
 
 func diff(input, label mtx.Mtx, ms []mtx.Mtx, n int, h float64) (rm mtx.Mtx) {
 	rm = mtx.NewMtx(ms[n].Shape)
+	l := float64(len(ms[n].GetData()))
 	for i, x := range ms[n].GetData() {
 		t := x
 		ms[n].VSet(i, t+h)
@@ -62,25 +70,29 @@ func diff(input, label mtx.Mtx, ms []mtx.Mtx, n int, h float64) (rm mtx.Mtx) {
 		ms[n].VSet(i, t)
 		dx := (dx1 - dx2) / (2 * h)
 		rm.VSet(i, dx)
+		fmt.Printf("\r%f", float64(i)/l)
 	}
 	return
 }
 
 func gradientDescent(input, label, w1, wo, b mtx.Mtx) {
-	rate := 1.0
+	rate := 0.1
 	ms := make([]mtx.Mtx, 3)
 	ms[0] = w1.Clone()
 	ms[1] = wo.Clone()
 	ms[2] = b.Clone()
 	for i := 0; i < 1000; i++ {
+		sTime := time.Now()
 		for j, m := range ms {
 			g := diff(input, label, ms, j, rate)
 			//			fmt.Printf("%+v", g)
 			ms[j] = mtx.Axpy(-1*rate, g, m)
 			fmt.Println(loss(input, label, ms[0], ms[1], ms[2]))
 		}
+		eTime := time.Now()
 		o := predict(input, ms[0], ms[1], ms[2])
-		fmt.Println(o.GetData())
+		fmt.Println(o.GetData(), eTime.Sub(sTime))
+		saveM(ms)
 	}
 }
 
