@@ -6,27 +6,27 @@ import (
 
 type AffineBrane struct {
 	x  mtx.Mtx
-	w  mtx.Mtx
+	W  mtx.Mtx
 	Dw mtx.Mtx
-	b  float64
+	B  float64
 	Db float64
 }
 
 func NewAffineBrane(w mtx.Mtx, b float64) AffineBrane {
 	return AffineBrane{
-		w: w,
-		b: b,
+		W: w,
+		B: b,
 	}
 }
 
 func (brn *AffineBrane) Forward(x mtx.Mtx) mtx.Mtx {
-	brn.x = x
-	return mtx.MulBeta(x, brn.w, brn.b)
+	brn.x = x.Clone()
+	return mtx.MulBeta(x.Clone(), brn.W.Clone(), brn.B)
 }
 
 func (brn *AffineBrane) Backward(dout mtx.Mtx) mtx.Mtx {
-	dx := mtx.MulBT(dout, brn.w)
-	brn.Dw = mtx.MulAT(brn.x, dout)
-	brn.Db = mtx.Sum(dout)
+	dx := mtx.MulBT(dout.Clone(), brn.W.Clone())
+	brn.Dw = mtx.MulAT(brn.x.Clone(), dout.Clone())
+	brn.Db = mtx.Sum(dout.Clone())
 	return dx
 }

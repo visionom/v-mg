@@ -11,19 +11,24 @@ type CrossEntropyErrorBrane struct {
 	x mtx.Mtx
 }
 
-func (brn *CrossEntropyErrorBrane) Forward(t, x mtx.Mtx) float64 {
-	var e float64
-	n := len(t.GetData())
-	for i, ti := range t.GetData() {
-		e -= ti * math.Log(x.VGet(i)) / float64(n)
-	}
-	return e
+func NewCrossEntropyErrorBrane(t mtx.Mtx) CrossEntropyErrorBrane {
+	return CrossEntropyErrorBrane{t: t}
 }
 
-func (brn *CrossEntropyErrorBrane) Backward() mtx.Mtx {
+func (brn *CrossEntropyErrorBrane) Forward(x mtx.Mtx) mtx.Mtx {
+	var e float64
+	brn.x = x.Clone()
+	n := brn.t.Shape[0]
+	for i, ti := range brn.t.GetData() {
+		e -= ti * math.Log(x.VGet(i)+1e-7)
+	}
+	return mtx.NewMtxNE(mtx.Shape{1, 1}, []float64{(e + 1e-7) / float64(n)})
+}
+
+func (brn *CrossEntropyErrorBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 	dx := mtx.NewMtx(brn.x.Shape)
 	for i, ix := range brn.x.GetData() {
-		dx.VSet(i, -1*brn.t.VGet(i)/ix)
+		dx.VSet(i, -1*brn.t.VGet(i)/(ix+1e-7))
 	}
 	return dx
 }

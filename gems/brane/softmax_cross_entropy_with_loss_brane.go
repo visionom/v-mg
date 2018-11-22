@@ -5,27 +5,28 @@ import (
 )
 
 type SoftmaxCrossEntropyLossBrane struct {
-	loss float64
+	loss mtx.Mtx
 	y    mtx.Mtx
 	t    mtx.Mtx
 	b1   SoftmaxBrane
 	b2   CrossEntropyErrorBrane
 }
 
-func NewSoftmaxCrossEntropyLossBrane() SoftmaxCrossEntropyLossBrane {
-	return SoftmaxCrossEntropyLossBrane{}
+func NewSoftmaxCrossEntropyLossBrane(t mtx.Mtx) SoftmaxCrossEntropyLossBrane {
+	b1 := NewSoftmaxBrane()
+	b2 := NewCrossEntropyErrorBrane(t)
+	return SoftmaxCrossEntropyLossBrane{t: t, b1: b1, b2: b2}
 }
 
-func (brn *SoftmaxCrossEntropyLossBrane) Forward(x, t mtx.Mtx) float64 {
-	brn.t = t
-	brn.b1 = SoftmaxBrane{}
-	brn.b2 = CrossEntropyErrorBrane{}
+func (brn *SoftmaxCrossEntropyLossBrane) Forward(x mtx.Mtx) mtx.Mtx {
 	brn.y = brn.b1.Forward(x)
-	brn.loss = brn.b2.Forward(brn.t, brn.y)
+	//fmt.Println(brn.y.GetData())
+	brn.loss = brn.b2.Forward(brn.y)
+	//fmt.Println(brn.loss.GetData())
 	return brn.loss
 }
 
-func (brn *SoftmaxCrossEntropyLossBrane) Backward() mtx.Mtx {
+func (brn *SoftmaxCrossEntropyLossBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 	dx := mtx.Ax(1.0/float64(brn.t.Shape[0]), mtx.Axpy(-1, brn.t, brn.y))
 	return dx
 }

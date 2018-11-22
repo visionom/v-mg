@@ -86,7 +86,7 @@ func initT(s mtx.Shape, label []int) mtx.Mtx {
 
 func model(input, w1, wo, bs mtx.Mtx) mtx.Mtx {
 	b1 := brane.NewSigmoidBrane()
-	h1 := b1.Backward(mtx.Aopy(bs.VGet(0), mtx.Mul(input, w1)))
+	h1 := b1.Forward(mtx.Aopy(bs.VGet(0), mtx.Mul(input, w1)))
 
 	o := mtx.Aopy(bs.VGet(1), mtx.Mul(h1, wo))
 	return o

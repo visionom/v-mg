@@ -16,25 +16,34 @@ func NewSoftmaxBrane() SoftmaxBrane {
 
 func (brn *SoftmaxBrane) Forward(x mtx.Mtx) mtx.Mtx {
 	s := make([]float64, x.Shape[0])
-	e := mtx.NewMtx(x.Shape)
-	var c float64
-	rx := mtx.NewMtx(x.Shape)
-	for j := 0; j < x.Shape[0]; j++ {
-		for i := 0; i < x.Shape[1]; i++ {
-			e.Set(j, i, math.Exp(x.Get(j, i)-c))
-			s[j] += e.Get(j, i)
+	ra := mtx.NewMtx(x.Shape)
+	for i := 0; i < ra.Shape[0]; i++ {
+		r := x.GetRow(i)
+		sum := 0.0
+		for j, x := range r.GetData() {
+			ra.Set(i, j, math.Exp(x+1.0e-7))
+			sum += ra.Get(i, j)
 		}
-		for i := 0; i < rx.Shape[1]; i++ {
-			rx.Set(j, i, e.Get(j, i)/s[j])
+		if sum == 0.0 {
+			s[i] = 1.0
+			for j := range r.GetData() {
+				ra.Set(i, j, 0.1)
+			}
+		} else {
+			s[i] = sum
+			for j := range r.GetData() {
+				ra.Set(i, j, ra.Get(i, j)/sum)
+			}
 		}
 	}
-	return rx
+	brn.s = s
+	return ra
 }
 
 func (brn *SoftmaxBrane) Backward(dout mtx.Mtx) mtx.Mtx {
 	dx := mtx.NewMtx(dout.Shape)
 	for i, idout := range dout.GetData() {
-		dx.VSet(i, (brn.s[i]-math.Log(idout))/brn.s[i])
+		dx.VSet(i, (brn.s[i%dout.Shape[0]]-math.Log(idout+1.0e-7))/brn.s[i%dout.Shape[0]])
 	}
 	return dx
 }

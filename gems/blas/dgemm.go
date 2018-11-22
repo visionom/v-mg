@@ -1,5 +1,10 @@
 package blas
 
+type point struct {
+	P int
+	D float64
+}
+
 func Dgemm(transA, transB rune, m, n, k int, alpha float64, a []float64, lda int, b []float64, ldb int, beta float64, c []float64, ldc int) (rc []float64) {
 	rc = make([]float64, m*n)
 	noTA := false
@@ -33,7 +38,12 @@ func Dgemm(transA, transB rune, m, n, k int, alpha float64, a []float64, lda int
 	if noTB {
 		if noTA {
 			// C := alpha*A*B + beta*C.
+
+			//var wg sync.WaitGroup
+			//wg.Add(n)
 			for j := 0; j < n; j++ {
+				//	go func(wg *sync.WaitGroup, j int) {
+				//		wg.Done()
 				if beta != 0 {
 					for i := 0; i < m; i++ {
 						rc[i*n+j] = beta * c[i*n+j]
@@ -45,7 +55,9 @@ func Dgemm(transA, transB rune, m, n, k int, alpha float64, a []float64, lda int
 						rc[i*n+j] += t * a[i*k+l]
 					}
 				}
+				//	}(&wg, j)
 			}
+			//wg.Wait()
 		} else {
 			// C := alpha*A**T*B + beta*C
 			for j := 0; j < n; j++ {
