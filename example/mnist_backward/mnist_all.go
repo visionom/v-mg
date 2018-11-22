@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -21,41 +22,26 @@ func main() {
 
 	TrainData := readImage("./MNIST_data/train-images-idx3-ubyte")
 	TrainLabel := readLabel("./MNIST_data/train-labels-idx1-ubyte")
-	w1 := brane.Normpdf(mtx.NewMtx(mtx.Shape{784, 625}), 0.0, 1)
-	wo := brane.Normpdf(mtx.NewMtx(mtx.Shape{625, 10}), 0.0, 0.1)
-	b := mtx.NewMtx(mtx.Shape{1, 2})
-	b.VSet(0, 0.0)
-	b.VSet(1, 0.0)
+	ms := readM()
 	if false {
-		ms := readM()
-		w1 = ms[0]
-		wo = ms[1]
-		b = ms[2]
+		ms[0] = brane.Normpdf(mtx.NewMtx(mtx.Shape{784, 625}), 0.0, 1)
+		ms[1] = brane.Normpdf(mtx.NewMtx(mtx.Shape{625, 10}), 0.0, 0.1)
+		ms[2] = mtx.NewMtx(mtx.Shape{1, 2})
+		ms[2].VSet(0, 0.0)
+		ms[2].VSet(1, 0.0)
 	}
 
 	lens := 100
-	//5 0 4 1 9 2 1 3 1 4
-	//3 5 3 6 1 7 2 8 6 9
-	//4 0 9 1 1 2 4 3 2 7
-	//3 8 6 9 0 5 6 0 7 6
-	//1 8 7 9 3 9 8 5 9 3
-	//3 0 7 4 9 8 0 9 4 1
-	//4 4 6 0 4 5 6 1 0 0
-	//1 7 1 6 3 0 2 1 1 7
-	//9 0 2 6 7 8 3 9 0 4
-	//6 7 4 6 8 0 7 8 3 1
-	list := make([]int, lens)
-	for i := range list {
-		list[i] = i
-	}
 
-	input := TrainData.GetRows(list)
-	label := TrainLabel[0:lens]
+	rawInput := TrainData
+	rawLabel := TrainLabel
 
-	fmt.Println(label)
-	o := predict(input, w1, wo, b)
+	gradientDescent(rawInput, rawLabel, ms)
+
+	input, label := getRandParams(rawInput, rawLabel, lens)
+	fmt.Println(getMax(label))
+	o := predict(input, ms)
 	fmt.Println(o.GetData())
-	gradientDescent(input, initT(label), w1, wo, b)
 }
 
 type Brane interface {
@@ -71,42 +57,53 @@ func initT(label []int) mtx.Mtx {
 	return m
 }
 
-func predict(input, w1, wo, b mtx.Mtx) mtx.Mtx {
-	//log.Println("Predict")
-	b0 := brane.NewAffineBrane(w1.Clone(), b.VGet(0))
-	b1 := brane.NewReluBrane()
-	b2 := brane.NewAffineBrane(wo.Clone(), b.VGet(1))
-	bs := []Brane{&b0, &b1, &b2}
+func predict(input mtx.Mtx, ms []mtx.Mtx) mtx.Mtx {
+	bs := newBranes(input.Clone(), mtx.Mtx{}, ms, false)
 	o := forward(input.Clone(), bs)
 	return getMax(o)
 }
 
-func gradientDescent(input, label, w1, wo, b mtx.Mtx) {
-	log.Println("Descent")
-	rate := 0.01
-	ms := make([]mtx.Mtx, 3)
-	ms[0] = w1.Clone()
-	ms[1] = wo.Clone()
-	ms[2] = b.Clone()
+func getGrad(bs []Brane) []mtx.Mtx {
+	gs := make([]mtx.Mtx, 3)
+	gs[2] = mtx.NewMtx(mtx.Shape{2, 1})
+	for i, j := range []int{0, 2} {
+		if b, ok := bs[j].(*brane.AffineBrane); ok {
+			gs[i] = b.Dw.Clone()
+			gs[2].VSet(i, b.Db)
+		} else {
+			panic(b)
+		}
+	}
+	return gs
+}
 
-	for i := 0; i < 1000; i++ {
-		sTime := time.Now()
-		b0 := brane.NewAffineBrane(ms[0].Clone(), ms[2].VGet(0))
-		b1 := brane.NewReluBrane()
-		b2 := brane.NewAffineBrane(ms[1].Clone(), ms[2].VGet(1))
+func newBranes(input, label mtx.Mtx, ms []mtx.Mtx, last bool) []Brane {
+	b0 := brane.NewAffineBrane(ms[0].Clone(), ms[2].VGet(0))
+	b1 := brane.NewReluBrane()
+	b2 := brane.NewAffineBrane(ms[1].Clone(), ms[2].VGet(1))
+	if last {
 		b3 := brane.NewSoftmaxCrossEntropyLossBrane(label.Clone())
-		bs := []Brane{&b0, &b1, &b2, &b3}
+		return []Brane{&b0, &b1, &b2, &b3}
+	}
+	return []Brane{&b0, &b1, &b2}
+}
 
+func gradientDescent(rawInput mtx.Mtx, rawLabel []int, ms []mtx.Mtx) []mtx.Mtx {
+	rate := 0.01
+	for i := 0; i < 1000; i++ {
+		input, label := getRandParams(rawInput, rawLabel, 100)
+		sTime := time.Now()
+		bs := newBranes(input.Clone(), label.Clone(), ms, true)
 		loss := forward(input.Clone(), bs)
 		backward(loss, bs)
-		ms[0] = mtx.Axpy(-1*rate, b0.Dw, ms[0].Clone())
-		ms[1] = mtx.Axpy(-1*rate, b2.Dw, ms[1].Clone())
-		ms[2] = mtx.Axpy(-1*rate, mtx.NewMtxNE(mtx.Shape{1, 2},
-			[]float64{b0.Db, b2.Db}), ms[2].Clone())
+		gs := getGrad(bs)
+		for i, g := range gs {
+			ms[i] = mtx.Axpy(-1*rate, g, ms[i].Clone())
+		}
 
 		eTime := time.Now()
 		to := getMax(label)
-		o := predict(input.Clone(), ms[0].Clone(), ms[1].Clone(), ms[2].Clone())
+		o := predict(input.Clone(), ms)
 		sum := 0
 		for i, v := range to.GetData() {
 			if o.VGet(i) != v {
@@ -117,19 +114,15 @@ func gradientDescent(input, label, w1, wo, b mtx.Mtx) {
 		fmt.Println(to.GetData())
 		fmt.Println(o.GetData())
 		fmt.Println(sum, loss.GetData(), eTime.Sub(sTime))
-		//saveM(ms)
+		saveM(ms)
 	}
-	o := predict(input.Clone(), ms[0].Clone(), ms[1].Clone(), ms[2].Clone())
-	fmt.Println(o.GetData())
+	return ms
 }
 
 func forward(input mtx.Mtx, bs []Brane) mtx.Mtx {
 	x := input.Clone()
-	//fmt.Println("input x", x.GetData())
 	for _, b := range bs {
 		x = b.Forward(x.Clone())
-		//wait()
-		//	fmt.Println(i, "output x", x.GetData())
 	}
 	return x
 }
@@ -167,4 +160,17 @@ func clear() {
 	cmd := exec.Command("clear") //Linux example, its tested
 	cmd.Stdout = os.Stdout
 	cmd.Run()
+}
+
+func getRandParams(rawInput mtx.Mtx, rawLabel []int, lens int) (input, label mtx.Mtx) {
+	max := len(rawLabel)
+	list := make([]int, lens)
+	numlabel := make([]int, lens)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := range list {
+		n := r.Int() % max
+		list[i] = n
+		numlabel[i] = rawLabel[n]
+	}
+	return rawInput.GetRows(list), initT(numlabel)
 }
