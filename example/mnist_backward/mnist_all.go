@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -16,37 +17,66 @@ import (
 )
 
 func main() {
+	var (
+		training bool
+		_predict bool
+		newModel bool
+	)
+	flag.BoolVar(&training, "training", false, "dump config sample and exit")
+	flag.BoolVar(&_predict, "predict", false, "debug mode. Need read local config file")
+	flag.BoolVar(&newModel, "new_model", false, "Local config file path")
+	flag.Parse()
+
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	TrainData := readImage("./MNIST_data/train-images-idx3-ubyte")
-	TrainLabel := readLabel("./MNIST_data/train-labels-idx1-ubyte")
-	ms := readM()
-	if false {
-		ms[0] = brane.Normpdf(mtx.NewMtx(mtx.Shape{784, 625}), 0.0, 1)
-		ms[1] = brane.Normpdf(mtx.NewMtx(mtx.Shape{625, 10}), 0.0, 0.1)
-		ms[2] = mtx.NewMtx(mtx.Shape{1, 2})
-		ms[2].VSet(0, 0.0)
-		ms[2].VSet(1, 0.0)
+	ms := make([]mtx.Mtx, 4)
+	if newModel {
+		ms[0] = brane.Normpdf(mtx.NewMtx(mtx.Shape{784, 1024}), 0.0, 1)
+		ms[1] = brane.Normpdf(mtx.NewMtx(mtx.Shape{1024, 625}), 0.0, 0.1)
+		ms[2] = brane.Normpdf(mtx.NewMtx(mtx.Shape{625, 10}), 0.0, 0.1)
+		ms[3] = mtx.NewMtxNE(mtx.Shape{3, 1}, []float64{0, 0, 0})
+	} else {
+		ms = readM()
 	}
 
-	lens := 100
+	bs := &brane.Branes{
+		InitBranes: newBranes,
+		GetGrad:    getGrad,
+	}
 
-	rawInput := TrainData
-	rawLabel := TrainLabel
+	if training {
+		TrainData := readImage("./MNIST_data/train-images-idx3-ubyte")
+		TrainLabel := readLabel("./MNIST_data/train-labels-idx1-ubyte")
 
-	gradientDescent(rawInput, rawLabel, ms)
+		rawInput := TrainData
+		rawLabel := TrainLabel
 
-	input, label := getRandParams(rawInput, rawLabel, lens)
-	fmt.Println(getMax(label))
-	o := predict(input, ms)
-	fmt.Println(o.GetData())
-}
+		gradientDescent(rawInput, rawLabel, ms, bs)
+	}
 
-type Brane interface {
-	Forward(x mtx.Mtx) mtx.Mtx
-	Backward(dout mtx.Mtx) mtx.Mtx
+	if _predict {
+		TrainData := readImage("./MNIST_data/t10k-images-idx3-ubyte")
+		TrainLabel := readLabel("./MNIST_data/t10k-labels-idx1-ubyte")
+
+		rawInput := TrainData
+		rawLabel := TrainLabel
+
+		success := 0
+		sum := 0
+
+		for i, label := range rawLabel {
+			input := rawInput.GetRow(i)
+			o := bs.Predict(input, ms)
+			o = getMax(o)
+			sum++
+			if int(o.VGet(0)) == label {
+				success++
+			}
+			fmt.Printf("\r%f \t%d", float64(success)/float64(sum), i)
+		}
+	}
 }
 
 func initT(label []int) mtx.Mtx {
@@ -57,19 +87,13 @@ func initT(label []int) mtx.Mtx {
 	return m
 }
 
-func predict(input mtx.Mtx, ms []mtx.Mtx) mtx.Mtx {
-	bs := newBranes(input.Clone(), mtx.Mtx{}, ms, false)
-	o := forward(input.Clone(), bs)
-	return getMax(o)
-}
-
-func getGrad(bs []Brane) []mtx.Mtx {
-	gs := make([]mtx.Mtx, 3)
-	gs[2] = mtx.NewMtx(mtx.Shape{2, 1})
-	for i, j := range []int{0, 2} {
+func getGrad(bs []brane.Brane) []mtx.Mtx {
+	gs := make([]mtx.Mtx, 4)
+	gs[3] = mtx.NewMtx(mtx.Shape{3, 1})
+	for i, j := range []int{0, 2, 4} {
 		if b, ok := bs[j].(*brane.AffineBrane); ok {
 			gs[i] = b.Dw.Clone()
-			gs[2].VSet(i, b.Db)
+			gs[3].VSet(i, b.Db)
 		} else {
 			panic(b)
 		}
@@ -77,60 +101,50 @@ func getGrad(bs []Brane) []mtx.Mtx {
 	return gs
 }
 
-func newBranes(input, label mtx.Mtx, ms []mtx.Mtx, last bool) []Brane {
-	b0 := brane.NewAffineBrane(ms[0].Clone(), ms[2].VGet(0))
+func newBranes(ms []mtx.Mtx, last bool, label mtx.Mtx) []brane.Brane {
+	b0 := brane.NewAffineBrane(ms[0].Clone(), ms[3].VGet(0))
 	b1 := brane.NewReluBrane()
-	b2 := brane.NewAffineBrane(ms[1].Clone(), ms[2].VGet(1))
+	b2 := brane.NewAffineBrane(ms[1].Clone(), ms[3].VGet(1))
+	b3 := brane.NewReluBrane()
+	b4 := brane.NewAffineBrane(ms[2].Clone(), ms[3].VGet(2))
 	if last {
-		b3 := brane.NewSoftmaxCrossEntropyLossBrane(label.Clone())
-		return []Brane{&b0, &b1, &b2, &b3}
+		b5 := brane.NewSoftmaxCrossEntropyLossBrane(label.Clone())
+		return []brane.Brane{&b0, &b1, &b2, &b3, &b4, &b5}
 	}
-	return []Brane{&b0, &b1, &b2}
+	return []brane.Brane{&b0, &b1, &b2, &b3, &b4}
 }
 
-func gradientDescent(rawInput mtx.Mtx, rawLabel []int, ms []mtx.Mtx) []mtx.Mtx {
+func gradientDescent(rawInput mtx.Mtx, rawLabel []int, ms []mtx.Mtx, bs *brane.Branes) []mtx.Mtx {
 	rate := 0.01
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		input, label := getRandParams(rawInput, rawLabel, 100)
 		sTime := time.Now()
-		bs := newBranes(input.Clone(), label.Clone(), ms, true)
-		loss := forward(input.Clone(), bs)
-		backward(loss, bs)
-		gs := getGrad(bs)
+		branes := bs.InitBranes(ms, true, label)
+		loss := bs.Forward(input.Clone(), branes)
+		//writeLoss(loss.VGet(0))
+		bs.Backward(loss, branes)
+		gs := bs.GetGrad(branes)
 		for i, g := range gs {
 			ms[i] = mtx.Axpy(-1*rate, g, ms[i].Clone())
 		}
 
 		eTime := time.Now()
-		to := getMax(label)
-		o := predict(input.Clone(), ms)
-		sum := 0
-		for i, v := range to.GetData() {
-			if o.VGet(i) != v {
-				sum++
+		if i%1 == 0 {
+			to := getMax(label)
+			o := getMax(bs.Predict(input.Clone(), ms))
+			sum := 0
+			for i, v := range to.GetData() {
+				if o.VGet(i) != v {
+					sum++
+				}
 			}
+			fmt.Println(to.GetData())
+			fmt.Println(o.GetData())
+			fmt.Println(sum, loss.GetData(), eTime.Sub(sTime))
+			//saveM(ms)
 		}
-		clear()
-		fmt.Println(to.GetData())
-		fmt.Println(o.GetData())
-		fmt.Println(sum, loss.GetData(), eTime.Sub(sTime))
-		saveM(ms)
 	}
 	return ms
-}
-
-func forward(input mtx.Mtx, bs []Brane) mtx.Mtx {
-	x := input.Clone()
-	for _, b := range bs {
-		x = b.Forward(x.Clone())
-	}
-	return x
-}
-
-func backward(dout mtx.Mtx, bs []Brane) {
-	for i := len(bs); i > 0; i-- {
-		dout = bs[i-1].Backward(dout.Clone())
-	}
 }
 
 func getMax(o mtx.Mtx) mtx.Mtx {
@@ -160,6 +174,12 @@ func clear() {
 	cmd := exec.Command("clear") //Linux example, its tested
 	cmd.Stdout = os.Stdout
 	cmd.Run()
+}
+
+func getData(rawInput mtx.Mtx, rawLabel []int, i int) (input, label mtx.Mtx) {
+	list := make([]int, 1)
+	list[0] = rawLabel[i]
+	return rawInput.GetRow(i), initT(list)
 }
 
 func getRandParams(rawInput mtx.Mtx, rawLabel []int, lens int) (input, label mtx.Mtx) {
